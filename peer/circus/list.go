@@ -166,10 +166,10 @@ func (l *List) choose() (peer.Peer, func(error)) {
 
 	// If we deplete the entire low concurrency ring, we swap the high
 	// concurrency ring.
-	// Assuming relatively homogenous latency for all requests,
-	// this would usually occor only when concurrency for the whole list is
+	// Assuming relatively homogeneous latency for all requests,
+	// this would usually occur only when concurrency for the whole list is
 	// climbing.
-	// When latency is not homogenous, well, perfect load distribution is the
+	// When latency is not homogeneous, well, perfect load distribution is the
 	// enemy of fast load distribution.
 	if l.nodes.empty(l.lo) {
 		l.hi, l.lo = l.lo, l.hi
@@ -222,7 +222,7 @@ func (l *List) Update(updates peer.ListUpdates) error {
 	// This algorithm does not gracefully recover from panics.
 	// The defer above does nothing to unwind inconsistencies if a panic occurs
 	// amid a transaction.
-	// For example, panicing before returning a node to the free list would
+	// For example, panicking before returning a node to the free list would
 	// cause a leak and eventually render the list permanently empty.  This
 	// would manifest as timeouts or no available peer errors.
 
@@ -257,7 +257,7 @@ func (l *List) Update(updates peer.ListUpdates) error {
 		// The maximum capacity of this peer list is 252 peers.
 		// Beyond that, this list ignores all further peers.
 		// TODO consider forcibly thinning out the low ring or randomly
-		// subsetting the additions and borrow a few tricks from reservoir
+		// sub-setting the additions and borrow a few tricks from reservoir
 		// sampling.
 		if l.nodes.empty(_free) {
 			break
