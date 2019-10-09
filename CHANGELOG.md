@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Added fail-fast option to peer lists.  With this option enabled, a peer list
   will return an error if no peers are connected at the time of a call, instead
   of waiting for an available peer or the context to time out.
+- Added the circus load balancer.  The circus is a high performance fewest
+  pending requests strategy that degenerates to round-robin.  It earns its
+  performance by using just a pair of linked lists allocated in an arena and
+  tracking pending request counts inexactly.
 ### Fixed
 - Previously, every peer list reported itself as a "single" peer list for
   purposes of debugging, instead of its own name.
