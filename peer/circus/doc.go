@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-// Package peercircus provides a high performance load balancer.
+// Package circus provides a high performance load balancer.
 //
 // The primary premise of the circus peer list is that a production peer list
 // will typically only have two classes of peer: those that have a certain
@@ -72,4 +72,4 @@
 //
 // The circus tends to choose peers in round-robin order but will tend to favor
 // peers with fewer concurrent requests.
-package peercircus
+package circus
