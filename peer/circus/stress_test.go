@@ -32,7 +32,7 @@ func TestStressCircus(t *testing.T) {
 	test := yarpctest.ListStressTest{
 		Workers:  1000,
 		Duration: time.Second,
-		Timeout:  10 * time.Millisecond,
+		Timeout:  20 * time.Millisecond,
 		Latency:  10 * time.Millisecond,
 		New: func(t peer.Transport) peer.ChooserList {
 			return New(t)
