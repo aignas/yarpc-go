@@ -56,6 +56,10 @@ type List struct {
 	// clients and transports, when calls end, and when peer connection
 	// statuses change.
 	subscribers [size]subscriber
+	// index tracks the position of all known peers.
+	// An entry in this index that is present but zero means that the peer was
+	// added, but did not receive a node due to the capacity limit.
+	index map[string]uint8
 
 	// hi is the index of the head node of the ring of
 	// available peers with likely to have more load.
@@ -82,6 +86,7 @@ func New(transport peer.Transport, opts ...Option) *List {
 		nodes:              _zero,
 		hi:                 _hi,
 		lo:                 _lo,
+		index:              make(map[string]uint8),
 		peerAvailableEvent: make(chan struct{}, 1),
 		randSrc:            rand.NewSource(options.seed),
 	}
@@ -211,39 +216,29 @@ func (l *List) Update(updates peer.ListUpdates) error {
 
 	var errs error
 
-	// This implementation of Update is relatively slow because we do not keep
-	// a map of peer identifiers to the corresponding indexes of those peers.
-	// We also don't build one on demand, opting to search for peers by brute
-	// force.
-	// The theory is that updates are rare enough and the sizes of lists are
-	// bounded to 256 so the duration of an update perhaps does not matter
-	// much.
-
-	// This algorithm does not gracefully recover from panics.
-	// The defer above does nothing to unwind inconsistencies if a panic occurs
-	// amid a transaction.
-	// For example, panicking before returning a node to the free list would
-	// cause a leak and eventually render the list permanently empty.  This
-	// would manifest as timeouts or no available peer errors.
-
-	// (removals * 256) iterations but hash tag shrug emoji at least it should
-	// be easy to improve upon, maybe.
 	for _, pid := range updates.Removals {
-		for index := 0; index < size; index++ {
-			p := l.peers[index]
-			if p != nil && p.Identifier() == pid.Identifier() {
-				err := l.transport.ReleasePeer(p, &l.subscribers[index])
-				if err != nil {
-					errs = multierr.Append(errs, err)
-				} else {
-					// release the peer for garbage collection to avoid heap
-					// bloat.
-					l.peers[index] = nil
-					l.statuses[index] = peer.Unavailable
-					// move the node to the end of the free list for later
-					// reuse.
-					l.nodes.shift(uint8(index), _free)
-				}
+		addr := pid.Identifier()
+		index := l.index[addr]
+		// index, exists := l.index[addr]
+		// if !exists {
+		// 	panic(fmt.Sprintf("remove never added: %s", addr))
+		// }
+		delete(l.index, addr)
+		if index > 0 {
+			// if l.peers[index].Identifier() != addr {
+			// 	panic(fmt.Sprintf("expected peer identifiers to match: %d %s %s", index, l.peers[index].Identifier(), addr))
+			// }
+			// remove from index of known peers.
+			// release the peer for garbage collection to avoid heap
+			// bloat.
+			l.peers[index] = nil
+			l.statuses[index] = peer.Unavailable
+			// move the node to the end of the free list for later
+			// reuse.
+			l.nodes.shift(uint8(index), _free)
+			err := l.transport.ReleasePeer(pid, &l.subscribers[index])
+			if err != nil {
+				errs = multierr.Append(errs, err)
 			}
 		}
 	}
@@ -254,20 +249,29 @@ func (l *List) Update(updates peer.ListUpdates) error {
 	}
 
 	for _, pid := range additions {
+		addr := pid.Identifier()
+		// if _, exists := l.index[addr]; exists {
+		// 	panic(fmt.Sprintf("add already added: %s", addr))
+		// }
+		l.index[addr] = 0
 		// The maximum capacity of this peer list is 252 peers.
 		// Beyond that, this list ignores all further peers.
 		// TODO consider forcibly thinning out the low ring or randomly
 		// sub-setting the additions and borrow a few tricks from reservoir
 		// sampling.
 		if l.nodes.empty(_free) {
-			break
+			continue
 		}
 		index := l.nodes[_free].next
 		peer, err := l.transport.RetainPeer(pid, &l.subscribers[index])
 		if err != nil {
 			errs = multierr.Append(errs, err)
 		} else {
+			l.index[addr] = index
 			l.peers[index] = peer
+			// Rotate the peer out of the free list.
+			l.nodes.shift(index, _no)
+			// Move to available list immediately if possible.
 			l.updateStatus(index, pid)
 		}
 	}
